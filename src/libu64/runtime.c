@@ -53,10 +53,10 @@ void Runtime_Delete(void* ptr) {
 
 void func_800FC868(void* blk, u32 nBlk, u32 blkSize, arg3_800FC868 arg3) {
     DECLARE_INTERRUPT_MASK
-    u32 pos;
+    uintptr_t pos;
 
     DISABLE_INTERRUPTS();
-    for (pos = ((u32)blk & ~0); pos < (u32)blk + (nBlk * blkSize); pos = (u32)pos + (blkSize & ~0)) {
+    for (pos = ((uintptr_t)blk & ~0); pos < (uintptr_t)blk + (nBlk * blkSize); pos = (uintptr_t)pos + (blkSize & ~0)) {
         arg3((void*)pos);
     }
     RESTORE_INTERRUPTS();
@@ -64,10 +64,10 @@ void func_800FC868(void* blk, u32 nBlk, u32 blkSize, arg3_800FC868 arg3) {
 
 void func_800FC8D8(void* blk, u32 nBlk, s32 blkSize, arg3_800FC8D8 arg3) {
     DECLARE_INTERRUPT_MASK
-    u32 pos;
+    uintptr_t pos;
 
     DISABLE_INTERRUPTS();
-    for (pos = ((u32)blk & ~0); pos < (u32)blk + (nBlk * blkSize); pos = (u32)pos + (blkSize & ~0)) {
+    for (pos = ((uintptr_t)blk & ~0); pos < (uintptr_t)blk + (nBlk * blkSize); pos = (uintptr_t)pos + (blkSize & ~0)) {
         arg3((void*)pos, 2);
     }
     RESTORE_INTERRUPTS();
@@ -75,7 +75,7 @@ void func_800FC8D8(void* blk, u32 nBlk, s32 blkSize, arg3_800FC8D8 arg3) {
 
 void* func_800FC948(void* blk, u32 nBlk, u32 blkSize, arg3_800FC948 arg3) {
     DECLARE_INTERRUPT_MASK
-    u32 pos;
+    uintptr_t pos;
 
     DISABLE_INTERRUPTS();
 
@@ -84,10 +84,10 @@ void* func_800FC948(void* blk, u32 nBlk, u32 blkSize, arg3_800FC948 arg3) {
     }
 
     if (blk != NULL && arg3 != NULL) {
-        pos = (u32)blk;
-        while (pos < (u32)blk + (nBlk * blkSize)) {
+        pos = (uintptr_t)blk;
+        while (pos < (uintptr_t)blk + (nBlk * blkSize)) {
             arg3((void*)pos, 0, 0, 0, 0, 0, 0, 0, 0);
-            pos = (u32)pos + (blkSize & ~0);
+            pos = (uintptr_t)pos + (blkSize & ~0);
         }
     }
 
@@ -97,14 +97,14 @@ void* func_800FC948(void* blk, u32 nBlk, u32 blkSize, arg3_800FC948 arg3) {
 
 void func_800FCA18(void* blk, u32 nBlk, u32 blkSize, arg3_800FCA18 arg3, s32 arg4) {
     DECLARE_INTERRUPT_MASK
-    u32 pos;
-    u32 end;
+    uintptr_t pos;
+    uintptr_t end;
 
     DISABLE_INTERRUPTS();
 
     if (blk != NULL) {
         if (arg3 != NULL) {
-            end = (u32)blk;
+            end = (uintptr_t)blk;
             pos = (u32)end + (nBlk * blkSize);
 
             while (pos > end) {
@@ -127,14 +127,14 @@ void Runtime_ExecuteGlobalCtors(void) {
     CtorEntry* prevEntry = NULL;
 
     while (nextOffset != 0) {
-        ctorEntry = (CtorEntry*)((s32)ctorEntry + nextOffset);
+        ctorEntry = (CtorEntry*)((intptr_t)ctorEntry + nextOffset);
 
         if (ctorEntry->func != NULL) {
             ctorEntry->func();
         }
 
         nextOffset = ctorEntry->nextOffset;
-        ctorEntry->nextOffset = (s32)prevEntry;
+        ctorEntry->nextOffset = (intptr_t)prevEntry;
         prevEntry = ctorEntry;
     }
 

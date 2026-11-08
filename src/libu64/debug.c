@@ -100,7 +100,13 @@ void LogUtils_CheckNullPointer(const char* exp, void* ptr, const char* file, int
 }
 
 void LogUtils_CheckValidPointer(const char* exp, void* ptr, const char* file, int line) {
-    if (ptr == NULL || (u32)ptr < 0x80000000 || (0x80000000 + osMemSize) <= (u32)ptr) {
+#if TARGET_NATIVE
+    // port: there is no KSEG0 RAM window natively; valid pointers are the ones above __PAGEZERO (4 GiB).
+    // See docs/port-macos/05-problemas-de-portabilidade.md §5
+    if ((uintptr_t)ptr < 0x100000000ull) {
+#else
+    if (ptr == NULL || (uintptr_t)ptr < 0x80000000 || (0x80000000 + osMemSize) <= (uintptr_t)ptr) {
+#endif
         PRINTF(VT_COL(RED, WHITE) T("%s %d:ポインタ %s(%08x) が異常です\n", "%s %d: Pointer %s(%08x) is invalid\n")
                    VT_RST,
                file, line, exp, ptr);

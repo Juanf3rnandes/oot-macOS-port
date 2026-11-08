@@ -1202,11 +1202,11 @@ void Fault_ThreadEntry(UNUSED void* arg) {
             osRecvMesg(&sFaultInstance->queue, &msg, OS_MESG_BLOCK);
 
             if (msg == FAULT_MSG_CPU_BREAK) {
-                sFaultInstance->msgId = (u32)FAULT_MSG_CPU_BREAK;
+                sFaultInstance->msgId = (uintptr_t)FAULT_MSG_CPU_BREAK;
                 osSyncPrintf(T("フォルトマネージャ:OS_EVENT_CPU_BREAKを受信しました\n",
                                "Fault Manager: OS_EVENT_CPU_BREAK received\n"));
             } else if (msg == FAULT_MSG_FAULT) {
-                sFaultInstance->msgId = (u32)FAULT_MSG_FAULT;
+                sFaultInstance->msgId = (uintptr_t)FAULT_MSG_FAULT;
                 osSyncPrintf(
                     T("フォルトマネージャ:OS_EVENT_FAULTを受信しました\n", "Fault Manager: OS_EVENT_FAULT received\n"));
             } else if (msg == FAULT_MSG_UNK) {
@@ -1214,7 +1214,7 @@ void Fault_ThreadEntry(UNUSED void* arg) {
                 faultedThread = NULL;
                 continue;
             } else {
-                sFaultInstance->msgId = (u32)FAULT_MSG_UNK;
+                sFaultInstance->msgId = (uintptr_t)FAULT_MSG_UNK;
                 osSyncPrintf(T("フォルトマネージャ:不明なメッセージを受信しました\n",
                                "Fault Manager: Unknown message received\n"));
             }
