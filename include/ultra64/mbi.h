@@ -36,8 +36,15 @@
 #include "abi.h"
 
 #define NUM_SEGMENTS        (16)
+#if TARGET_NATIVE
+// port: the argument may be a 64-bit native pointer; avoid truncating casts.
+// See docs/port-macos/05-problemas-de-portabilidade.md §5
+#define SEGMENT_OFFSET(a)   ((uintptr_t)(a) & 0x00FFFFFF)
+#define SEGMENT_NUMBER(a)   (((uintptr_t)(a) >> 24) & 0xF)
+#else
 #define SEGMENT_OFFSET(a)   ((u32)(a) & 0x00FFFFFF)
 #define SEGMENT_NUMBER(a)   (((u32)(a) << 4) >> 28)
+#endif
 #define SEGMENT_ADDR(num, off)  (((num) << 24) + (off))
 
 #endif

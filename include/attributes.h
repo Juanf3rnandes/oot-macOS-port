@@ -6,8 +6,15 @@
 #endif
 
 #define UNUSED       __attribute__((unused))
+#if TARGET_NATIVE
+// port: no_reorder is GCC-only and section(".data") is not a valid Mach-O section specifier.
+// Both only matter for matching the ROM layout. See docs/port-macos/05-problemas-de-portabilidade.md §9
+#define NO_REORDER
+#define SECTION_DATA
+#else
 #define NO_REORDER   __attribute__((no_reorder))
 #define SECTION_DATA __attribute__((section(".data")))
+#endif
 
 #if __GNUC__ >= 7
 #define FALLTHROUGH  __attribute__((fallthrough))
