@@ -1,0 +1,53 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/../build-native",
+            "cacheVariables": {
+                "OOT_VERSION": "gc-eu-mq-dbg"
+            }
+        },
+        {
+            "name": "debug",
+            "inherits": "base",
+            "displayName": "Debug (-O0 -g)",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "asan",
+            "inherits": "base",
+            "displayName": "Debug + AddressSanitizer + UBSan",
+            "binaryDir": "${sourceDir}/../build-native-asan",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "OOT_SANITIZE": "address,undefined" }
+        },
+        {
+            "name": "ubsan",
+            "inherits": "base",
+            "displayName": "Debug + UBSan",
+            "binaryDir": "${sourceDir}/../build-native-ubsan",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "OOT_SANITIZE": "undefined" }
+        },
+        {
+            "name": "release",
+            "inherits": "base",
+            "displayName": "Release (-O2)",
+            "binaryDir": "${sourceDir}/../build-native-release",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug", "configurePreset": "debug" },
+        { "name": "asan", "configurePreset": "asan" },
+        { "name": "ubsan", "configurePreset": "ubsan" },
+        { "name": "release", "configurePreset": "release" }
+    ],
+    "testPresets": [
+        { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } }
+    ]
+}

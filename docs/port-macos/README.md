@@ -1,6 +1,6 @@
 # Port nativo macOS — Documentação técnica e de arquitetura
 
-> **Status:** planejamento (nenhum código do port foi escrito ainda).
+> **Status:** M0 concluído, M1 em andamento — ver [Andamento](09-plano-de-implementacao.md#andamento) e [`port/README.md`](../../port/README.md).
 > **Branch de trabalho:** `feat/macOS-native-port`
 > **Público-alvo:** engenheiros do projeto, inclusive desenvolvedores júnior em C/C++ e programação low-level.
 

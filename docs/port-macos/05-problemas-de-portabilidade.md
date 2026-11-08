@@ -434,3 +434,57 @@ Ver [04 §4](04-arquitetura-do-port.md#4-modelo-de-threads) e [ADR-0003](adr/000
 o jogo assume **um núcleo + prioridade estrita**; rodar threads em paralelo cria corridas que nunca existiram.
 Também: código que espera em laço por um contador de hardware (`osGetCount`) deve continuar funcionando, pois o
 shim retorna tempo real.
+
+## 12. Encontrados ao compilar (M0/M1)
+
+Problemas que só apareceram ao compilar o código de verdade. Cada um tem a correção padrão adotada.
+
+### 12.1 Headers do jogo com o nome de headers do sistema
+
+`include/sched.h`, `include/printf.h` e `include/vis.h` têm o mesmo nome de headers do SDK do macOS. Com
+`-Iinclude`, um `#include <pthread.h>` do sistema acabaria puxando `include/sched.h` do jogo.
+**Correção:** os diretórios do jogo entram com `-iquote` (o jogo só usa `#include "..."`), nunca com `-I`.
+
+### 12.2 `include/libc/` não serve no build nativo
+
+`include/libc/stddef.h` define `size_t` como `unsigned int` (32 bits) e `stdint.h` não tem `int32_t`. O macOS também
+declara `bzero`/`bcmp`/`bcopy` com `size_t` (e às vezes como macros "fortificadas").
+**Correção:** `include/libc/` não entra no caminho de includes; `port/include/libc_compat/` fornece só o que é
+específico do jogo (`math.h`, `assert.h`, `alloca.h`) por cima dos headers do sistema (`#include_next`), e
+`include/ultra64/libc.h` usa `<strings.h>` sob `TARGET_NATIVE`.
+
+### 12.3 A libm do jogo não é a libm do host
+
+| Função | Jogo (N64) | Host | Diferença |
+|--------|-----------|------|-----------|
+| `roundf`, `lroundf` (`src/libc64/fp.s`) | `floor(x + 0.5)` | metade para longe de zero | `roundf(-2.5f)`: −2 vs −3 |
+| `floorf`, `ceilf`, `truncf`, `nearbyintf`… | convertem por inteiro de 32 bits | — | fora de ±2³¹ dão `0x7FFFFFFF` |
+| `fmodf` (`src/libc/fmodf.c`) | trunca o quociente por `s32` | exato | quocientes grandes |
+| `sinf`, `cosf` (`src/libultra/gu`) | polinômio próprio em `double` | outra implementação | últimos bits |
+| `M_PI` (`include/libc/math.h`) | literal `float` | literal `double` | promove a conta inteira para `double` |
+
+A física depende desses resultados exatos. **Correção:** o `math.h` de compatibilidade renomeia essas funções por
+macro para `ultra_*` (implementadas fielmente em `port/src/ultra/libm_native.c`) e redefine `M_PI` como `float`.
+Renomear em vez de definir `floorf` evita que o executável substitua a libm do processo inteiro (SDL, código C++).
+Pelo mesmo motivo `src/libc/memset.c` e `memmove.c` não são compilados.
+
+### 12.4 Constantes `double` montadas por palavras
+
+`sinf.c`/`cosf.c` inicializam a união `du` como `{ palavra_alta, palavra_baixa }`. Em little-endian a ordem dos
+32 bits fica invertida e as constantes viram lixo. `xprintf.c` lê o sinal de um `double` por
+`((unsigned short*)&x)[0]` — mesmo problema. **Correção:** `sinf`/`cosf` portados com as mesmas constantes montadas
+via `memcpy` de um `u64`; `_Printf` implementado sobre o `vsnprintf` do host (`port/src/ultra/printf_native.c`).
+
+### 12.5 Mach-O não tem *aliases* de símbolo
+
+As tabelas de áudio (`src/audio/tables/*.c`) usam `#pragma weak gSequenceTable = sSequenceTableHeader` e guardam
+símbolos do linker (`Sequence_0_Size`) como **valores**. Nenhum dos dois existe no formato Mach-O.
+**Correção:** adiada para o M5 (tabela de áudio gerada pelo pipeline de assets nativo); os arquivos estão em
+`OOT_GAME_DEFERRED` em `port/cmake/GameSources.cmake`.
+
+### 12.6 Macros de `gbi.h`/`abi.h` sem mudar os tokens do build *matching*
+
+Para alargar `w1` sem arriscar o *matching*, os casts viraram macros que, no build da ROM, expandem para os **mesmos
+tokens** originais: `_GW1(x)` → `(unsigned int)(x)` em `gbi.h` e `_AW1` → `(u32)` em `abi.h` (macro de objeto, para
+cobrir também `(u32)d` sem parênteses). `port/tools/check_matching_neutral.py` confirma que os 957 `.c` pré-processam
+igual antes e depois.

@@ -11,22 +11,52 @@ M0 Fundação ─► M1 Compila e linka ─► M2 Boot headless ─► M3 Primei
                                      M7 Estabilização ◄─ M6 Completude ◄─ M5 Áudio ◄┘
 ```
 
+## Andamento
+
+Legenda: `[x]` feito · `[~]` parcial · `[ ]` a fazer. Situação em **2026-11-08**:
+
+- **M0 — concluído** localmente: `cmake` + `ctest` verdes (34 testes, também em UBSan e Release). Falta o CI.
+  O build *matching* foi verificado com `port/tools/check_matching_neutral.py` (pré-processamento idêntico nos 957
+  `.c`, 3 configurações), não com `make` — não havia ROM nem toolchain MIPS na máquina.
+- **M1 — em andamento:** tipos/`gbi.h`/endereços nativos; lista de fontes gerada do `spec`; **todas as 269 fontes
+  que não dependem de assets compilam**; todos os símbolos de libultra resolvidos (shim + stubs). Bloqueado pela ROM:
+  as outras 399 fontes, os assets (`make setup`) e os símbolos de segmento do linker (`_xxxSegmentRomStart`, base da
+  ROM virtual do M2). Avisos: [`port/WARNINGS.md`](../../port/WARNINGS.md).
+- **M2:** filas de mensagens e timers prontos e testados (inclui `Sleep_*` em thread única).
+
+### Como retomar quando a ROM estiver disponível
+
+1. `cp <rom>.z64 baseroms/gc-eu-mq-dbg/baserom.z64 && make setup VERSION=gc-eu-mq-dbg`.
+2. **Antes de tudo, validar o *matching* de verdade** (exige toolchain MIPS, ver [`docs/BUILDING_MACOS.md`](../BUILDING_MACOS.md)):
+   `make VERSION=gc-eu-mq-dbg` → `OK`, e repetir para uma versão N64 (ex.: `ntsc-1.2`). Até hoje só o verificador
+   de pré-processamento foi usado.
+3. Reconfigurar: `cmake -S port -B build-native -G Ninja`. O CMake deixa de pular as 399 fontes que dependem de assets.
+4. `cmake --build build-native --target oot_game -- -k 0 2>&1 | tee build.log` e tratar os erros novos
+   (`port/tools/fix_pointer_casts.py build.log` resolve o padrão `(u32)ptr`; o resto, à mão, registrando em
+   [05 §12](05-problemas-de-portabilidade.md#12-encontrados-ao-compilar-m0m1)).
+5. Tarefas abertas do M1 que dependem disso: integração dos `.c` de assets, `--byte-array` no `bin2c.c`, e os
+   símbolos de segmento do linker (`_xxxSegmentRomStart` etc., ~2750) — que são a base da ROM virtual do M2.
+6. Atualizar [`port/WARNINGS.md`](../../port/WARNINGS.md) com a nova linha de base.
+
+Limitação do ambiente registrada: ASan trava na inicialização com Apple clang 17 / macOS 26 (até em "hello world");
+usar o preset `ubsan` ([`port/README.md`](../../port/README.md)).
+
 ---
 
 ## M0 — Fundação
 
 **Objetivo:** infraestrutura para compilar e testar código nativo sem tocar no jogo ainda.
 
-- [ ] 🟢 Criar `port/` com a estrutura de [04 §3](04-arquitetura-do-port.md#3-estrutura-de-diretórios-proposta).
-- [ ] 🟡 `port/CMakeLists.txt` mínimo: alvo `oot_port_core` (biblioteca), alvo de testes, Ninja, C11/C++17.
-- [ ] 🟢 Integrar GoogleTest via `FetchContent`; um teste trivial passando em `ctest`.
-- [ ] 🟢 `port/include/port/endian.h` (`BE16`, `BE32`, `BSWAP16/32/64`) + testes.
-- [ ] 🟡 Compilar **um** arquivo do jogo nativamente como prova (ex.: [`src/code/sys_math.c`](../../src/code/sys_math.c)) e testar
+- [x] 🟢 Criar `port/` com a estrutura de [04 §3](04-arquitetura-do-port.md#3-estrutura-de-diretórios-proposta).
+- [x] 🟡 `port/CMakeLists.txt` mínimo: alvo `oot_port_core` (biblioteca), alvo de testes, Ninja, C11/C++17.
+- [x] 🟢 Integrar GoogleTest via `FetchContent`; um teste trivial passando em `ctest`.
+- [x] 🟢 `port/include/port/endian.h` (`BE16`, `BE32`, `BSWAP16/32/64`) + testes.
+- [x] 🟡 Compilar **um** arquivo do jogo nativamente como prova (ex.: [`src/code/sys_math.c`](../../src/code/sys_math.c)) e testar
       2–3 funções puras (ex.: `Math_FactorialF`, `Math_PowF`, `Math_SinF`).
 - [ ] 🟡 CI (GitHub Actions, runner macOS arm64): `cmake --build` + `ctest`; job separado garantindo que o build
       *matching* continua `OK` (pode exigir ROM — se não houver ROM no CI, checar ao menos que o C do jogo compila com o
       compilador original ou que nenhum arquivo do jogo mudou sem `#if TARGET_NATIVE`).
-- [ ] 🟢 Adicionar `build-native/` ao `.gitignore`.
+- [x] 🟢 Adicionar `build-native/` ao `.gitignore`.
 
 **Critério de saída:** `cmake -S port -B build-native && cmake --build build-native && ctest` verde local e no CI;
 `make VERSION=gc-eu-mq-dbg` continua `OK`.
@@ -38,14 +68,14 @@ M0 Fundação ─► M1 Compila e linka ─► M2 Boot headless ─► M3 Primei
 **Objetivo:** todo o código do jogo + assets compilam com clang e linkam num executável (que ainda não faz nada).
 
 ### Tipos e headers
-- [ ] 🟡 `TARGET_NATIVE` em `ultratypes.h` e `Mtx_t` ([05 §1](05-problemas-de-portabilidade.md#1-modelo-de-dados-long-tem-64-bits-no-macos)).
-- [ ] 🔴 `Gfx` alargado e macros de `gbi.h` com `uintptr_t` ([ADR-0006](adr/0006-tipos-e-ponteiros-64bit.md)).
-- [ ] 🟡 `convert.h`, `segmented_address.h`: macros nativas ([05 §2.2, §5](05-problemas-de-portabilidade.md)).
-- [ ] 🟢 `_Static_assert` de tamanhos em `port/include/port/port.h`.
-- [ ] 🟢 `NO_REORDER` vazio sob `TARGET_NATIVE` ([`include/attributes.h`](../../include/attributes.h)).
+- [x] 🟡 `TARGET_NATIVE` em `ultratypes.h` e `Mtx_t` ([05 §1](05-problemas-de-portabilidade.md#1-modelo-de-dados-long-tem-64-bits-no-macos)).
+- [x] 🔴 `Gfx` alargado e macros de `gbi.h` com `uintptr_t` ([ADR-0006](adr/0006-tipos-e-ponteiros-64bit.md)).
+- [x] 🟡 `convert.h`, `segmented_address.h`: macros nativas ([05 §2.2, §5](05-problemas-de-portabilidade.md)).
+- [x] 🟢 `_Static_assert` de tamanhos (em `port/tests/unit/types_check.c`, compilado com a ABI do jogo).
+- [x] 🟢 `NO_REORDER` vazio sob `TARGET_NATIVE` ([`include/attributes.h`](../../include/attributes.h)).
 
 ### Lista de fontes
-- [ ] 🟡 `cmake/GameSources.cmake`: lista dos `.c` a compilar, derivada de [`spec/`](../../spec/) para a versão escolhida,
+- [x] 🟡 `cmake/GameSources.cmake`: lista dos `.c` a compilar, derivada de [`spec/`](../../spec/) para a versão escolhida,
       **excluindo** `src/libultra`, `src/makerom`, `src/libleo`, `src/n64dd`, `.s`, e arquivos de boot substituídos.
       Idealmente gerada por script a partir do `spec` (as condições `#if` dependem da versão).
 - [ ] 🔴 Integração de assets: incluir os `.c` de `extracted/<v>/assets` e os `.inc.c` gerados em `build/<v>/assets`
@@ -53,14 +83,14 @@ M0 Fundação ─► M1 Compila e linka ─► M2 Boot headless ─► M3 Primei
 - [ ] 🟡 Opção `--byte-array` em [`bin2c.c`](../../tools/assets/n64texconv/src/libn64texconv/bin2c.c) para texturas ([05 §4.1](05-problemas-de-portabilidade.md#41-texturas-compiladas-como-u64)).
 
 ### Shim com stubs
-- [ ] 🟢 Para cada símbolo de libultra referenciado (o linker lista), criar stub em `port/src/ultra/` que chama
+- [x] 🟢 Para cada símbolo de libultra referenciado (o linker lista), criar stub em `port/src/ultra/` que chama
       `PORT_UNIMPLEMENTED("osXxx")` (loga e aborta). Isso transforma "erro de link" em "lista de tarefas".
-- [ ] 🟡 Substituir funções dos `.s` ([05 §8](05-problemas-de-portabilidade.md#8-assembly)) por C.
+- [~] 🟡 Substituir funções dos `.s` ([05 §8](05-problemas-de-portabilidade.md#8-assembly)) por C.
 
 ### Correções de compilação
-- [ ] 🟡 Corrigir erros de compilação arquivo por arquivo. Para cada tipo de erro recorrente, documentar a correção
+- [~] 🟡 Corrigir erros de compilação arquivo por arquivo. Para cada tipo de erro recorrente, documentar a correção
       padrão em [05](05-problemas-de-portabilidade.md).
-- [ ] 🟡 Ligar `-Wpointer-to-int-cast -Wint-to-pointer-cast -Wshorten-64-to-32` e **registrar** a contagem de avisos
+- [~] 🟡 Ligar `-Wpointer-to-int-cast -Wint-to-pointer-cast -Wshorten-64-to-32` e **registrar** a contagem de avisos
       (não precisa zerar ainda; precisa não crescer).
 
 **Critério de saída:** executável linka; `ctest` com testes de tipos verde; `make` *matching* `OK`; contagem de avisos
@@ -72,8 +102,8 @@ registrada em `port/WARNINGS.md`.
 
 **Objetivo:** o jogo inicializa e roda frames de lógica sem janela, sem som, sem crash.
 
-- [ ] 🟡 `OSMesgQueue` completo + testes ([10 §3.2](10-estrategia-de-testes.md)).
-- [ ] 🟡 `osGetTime`/`osGetCount`/timers.
+- [x] 🟡 `OSMesgQueue` completo + testes ([10 §3.2](10-estrategia-de-testes.md)).
+- [x] 🟡 `osGetTime`/`osGetCount`/timers.
 - [ ] 🔴 `Port_Main`: reproduzir a sequência de `Idle_ThreadEntry` → `Main_ThreadEntry` → `Main` sem threads
       ([04 §4](04-arquitetura-do-port.md#4-modelo-de-threads)).
 - [ ] 🔴 Desmontar `Graph_ThreadEntry` em `Port_GameInit/RunFrame/Shutdown` (com `#if TARGET_NATIVE` em
